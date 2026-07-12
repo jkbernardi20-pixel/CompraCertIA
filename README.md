@@ -57,7 +57,42 @@ python -m compracertia alternativa --item Café --marca "Três Corações" \
 justificam a equivalência de qualidade. Cadastrar de novo a mesma
 marca/unidade atualiza o preço.
 
-### 3. Ver o relatório
+### 3. Importar compras em lote (CSV)
+
+Para não digitar item por item, importe um CSV com cabeçalho:
+
+```bash
+python -m compracertia importar compras.csv
+```
+
+Colunas: `item`, `marca`, `preco` (obrigatórias) e, opcionais, `quantidade`,
+`unidade`, `data`, `categoria`. Exemplo:
+
+```csv
+item,marca,preco,quantidade,unidade,data,categoria
+Café,Melitta,18.90,1,500g,2025-01-10,A
+Café,Melitta,19.50,1,500g,2025-02-10,
+Azeite,Gallo,35.00,1,500ml,2025-01-15,A
+```
+
+A `categoria` só é necessária na primeira vez que cada item aparece. Linhas
+inválidas são ignoradas e reportadas com o número da linha — as válidas
+entram normalmente.
+
+### 4. Corrigir ou remover uma compra
+
+Cada compra tem um id (mostrado em `compras`). Para corrigir um registro
+errado, informe só os campos que mudam:
+
+```bash
+python -m compracertia editar 12 --preco 15.00 --marca "Três Corações"
+python -m compracertia remover 12
+```
+
+A edição altera marca, preço, quantidade, unidade e data. Para trocar o item
+em si, remova e registre de novo.
+
+### 5. Ver o relatório
 
 ```bash
 python -m compracertia relatorio
@@ -73,10 +108,22 @@ O relatório (sob demanda) mostra:
 - **Categoria B**: listados como recorrentes, mas explicitamente fora da
   otimização.
 
+### Interface web local (opcional)
+
+Se preferir clicar a digitar, há uma página local mínima (sem deploy, só na
+sua máquina) para registrar uma compra e ver o relatório:
+
+```bash
+python -m compracertia web        # abre em http://127.0.0.1:8000
+```
+
+Use `--porta` e `--host` para ajustar. A CLI continua sendo o caminho
+completo; a web cobre o essencial do dia a dia.
+
 ### Consultas rápidas
 
 ```bash
-python -m compracertia compras [--item Café]   # histórico
+python -m compracertia compras [--item Café]   # histórico (com ids)
 python -m compracertia itens                   # itens e categorias
 python -m compracertia alternativas [--item Café]
 ```

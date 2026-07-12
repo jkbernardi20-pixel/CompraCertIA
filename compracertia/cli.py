@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import db, relatorio
+from . import db, importacao, relatorio
 
 
 def _construir_parser() -> argparse.ArgumentParser:
@@ -55,7 +55,31 @@ def _construir_parser() -> argparse.ArgumentParser:
     p.add_argument("--unidade", default="un", help="deve bater com a unidade das compras")
     p.add_argument("--atributos", help="atributos técnicos relevantes (justificativa)")
 
+    p = sub.add_parser(
+        "importar", help="importar compras em lote de um arquivo CSV"
+    )
+    p.add_argument(
+        "arquivo",
+        help="CSV com cabeçalho; colunas: item, marca, preco[, quantidade, "
+        "unidade, data, categoria]",
+    )
+
+    p = sub.add_parser("editar", help="corrigir campos de uma compra registrada")
+    p.add_argument("id", type=int, help="id da compra (veja em 'compras')")
+    p.add_argument("--marca")
+    p.add_argument("--preco", type=float)
+    p.add_argument("--quantidade", type=float)
+    p.add_argument("--unidade")
+    p.add_argument("--data", help="AAAA-MM-DD")
+
+    p = sub.add_parser("remover", help="remover uma compra registrada errada")
+    p.add_argument("id", type=int, help="id da compra (veja em 'compras')")
+
     sub.add_parser("relatorio", help="gerar o relatório de recorrências e economia")
+
+    p = sub.add_parser("web", help="abrir a interface web local mínima")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--porta", type=int, default=8000)
 
     p = sub.add_parser("compras", help="listar compras registradas")
     p.add_argument("--item", help="filtrar por item")
@@ -70,6 +94,13 @@ def _construir_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _construir_parser().parse_args(argv)
+
+    if args.comando == "web":
+        from . import web  # importado sob demanda: só o comando 'web' precisa
+
+        web.servir(host=args.host, porta=args.porta, caminho_db=args.db)
+        return 0
+
     conn = db.conectar(args.db)
     try:
         if args.comando == "registrar":
@@ -100,6 +131,36 @@ def main(argv: list[str] | None = None) -> int:
                 f"Alternativa cadastrada para {args.item}: {args.marca} "
                 f"({args.unidade}) — R$ {args.preco:.2f}"
             )
+        elif args.comando == "importar":
+            with open(args.arquivo, encoding="utf-8-sig") as fonte:
+                resultado = importacao.importar_csv(conn, fonte.read())
+            print(f"{resultado.importadas} compra(s) importada(s).")
+            if resultado.erros:
+                print(f"{resultado.total_erros} linha(s) ignorada(s):", file=sys.stderr)
+                for linha, motivo in resultado.erros:
+                    print(f"  linha {linha}: {motivo}", file=sys.stderr)
+                return 1
+        elif args.comando == "editar":
+            db.editar_compra(
+                conn,
+                args.id,
+                marca=args.marca,
+                preco=args.preco,
+                quantidade=args.quantidade,
+                unidade=args.unidade,
+                data=args.data,
+            )
+            c = db.obter_compra(conn, args.id)
+            print(
+                f"Compra #{c['id']} atualizada: {c['data']}  {c['item']}  "
+                f"{c['quantidade']:g}x {c['unidade']}  {c['marca']}  R$ {c['preco']:.2f}"
+            )
+        elif args.comando == "remover":
+            c = db.obter_compra(conn, args.id)
+            if c is None:
+                raise ValueError(f"Compra #{args.id} não existe.")
+            db.remover_compra(conn, args.id)
+            print(f"Compra #{args.id} removida ({c['item']}, R$ {c['preco']:.2f}).")
         elif args.comando == "relatorio":
             print(relatorio.gerar_relatorio(conn))
         elif args.comando == "compras":
@@ -108,7 +169,7 @@ def main(argv: list[str] | None = None) -> int:
                 print("Nenhuma compra registrada.")
             for c in linhas:
                 print(
-                    f"{c['data']}  {c['item']} [{c['categoria']}]  "
+                    f"#{c['id']}  {c['data']}  {c['item']} [{c['categoria']}]  "
                     f"{c['quantidade']:g}x {c['unidade']}  {c['marca']}  "
                     f"R$ {c['preco']:.2f}"
                 )
@@ -125,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
             for a in linhas:
                 extra = f" — {a['atributos']}" if a["atributos"] else ""
                 print(f"{a['item']}: {a['marca']} ({a['unidade']}) R$ {a['preco']:.2f}{extra}")
-    except ValueError as erro:
+    except (ValueError, OSError) as erro:
         print(f"Erro: {erro}", file=sys.stderr)
         return 1
     finally:

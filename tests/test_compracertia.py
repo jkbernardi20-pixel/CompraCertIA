@@ -3,7 +3,7 @@
 import unittest
 from datetime import date
 
-from compracertia import analise, db, relatorio
+from compracertia import analise, db, importacao, relatorio
 
 
 def _banco():
@@ -111,6 +111,71 @@ class TestAnalise(unittest.TestCase):
         self.assertEqual(rec.unidade, "500g")
         self.assertEqual(rec.n_compras, 5)
         self.assertAlmostEqual(rec.preco_medio, 18.90)
+
+
+class TestEdicaoRemocao(unittest.TestCase):
+    def test_editar_corrige_campos(self):
+        conn = _banco()
+        cid = db.registrar_compra(conn, "Leite", "Italac", 5.99, 1, "1L", "2025-01-01", "A")
+        db.editar_compra(conn, cid, preco=4.49, quantidade=6)
+        c = db.obter_compra(conn, cid)
+        self.assertAlmostEqual(c["preco"], 4.49)
+        self.assertEqual(c["quantidade"], 6)
+        self.assertEqual(c["marca"], "Italac")  # inalterado
+
+    def test_editar_ignora_none_e_valida(self):
+        conn = _banco()
+        cid = db.registrar_compra(conn, "Leite", "Italac", 5.99, 1, "1L", "2025-01-01", "A")
+        with self.assertRaises(ValueError):
+            db.editar_compra(conn, cid)  # nada informado
+        with self.assertRaises(ValueError):
+            db.editar_compra(conn, cid, preco=-1)
+        with self.assertRaises(ValueError):
+            db.editar_compra(conn, 999, marca="X")  # compra inexistente
+
+    def test_remover(self):
+        conn = _banco()
+        cid = db.registrar_compra(conn, "Leite", "Italac", 5.99, 1, "1L", "2025-01-01", "A")
+        db.remover_compra(conn, cid)
+        self.assertIsNone(db.obter_compra(conn, cid))
+        with self.assertRaises(ValueError):
+            db.remover_compra(conn, cid)  # já não existe
+
+
+class TestImportacaoCSV(unittest.TestCase):
+    def test_importa_linhas_validas(self):
+        conn = _banco()
+        csv_texto = (
+            "item,marca,preco,quantidade,unidade,data,categoria\n"
+            "Café,Melitta,18.90,1,500g,2025-01-10,A\n"
+            "Café,Melitta,18.90,1,500g,2025-02-10,\n"
+            "Cerveja,Heineken,42.00,1,12un,2025-01-05,B\n"
+        )
+        res = importacao.importar_csv(conn, csv_texto)
+        self.assertEqual(res.importadas, 3)
+        self.assertEqual(res.erros, [])
+        self.assertEqual(len(db.listar_compras(conn, "Café")), 2)
+
+    def test_linha_invalida_nao_interrompe(self):
+        conn = _banco()
+        csv_texto = (
+            "item,marca,preco,categoria\n"
+            "Café,Melitta,18.90,A\n"
+            "Vinho,Miolo,55.00,\n"          # item novo sem categoria -> erro
+            ",Sem Item,10.00,A\n"           # falta item -> erro
+            "Azeite,Gallo,notanumber,A\n"   # preço inválido -> erro
+            "Pão,Wickbold,8.00,A\n"
+        )
+        res = importacao.importar_csv(conn, csv_texto)
+        self.assertEqual(res.importadas, 2)
+        self.assertEqual(res.total_erros, 3)
+        # números de linha do arquivo (cabeçalho = 1)
+        self.assertEqual([n for n, _ in res.erros], [3, 4, 5])
+
+    def test_cabecalho_obrigatorio(self):
+        conn = _banco()
+        with self.assertRaises(ValueError):
+            importacao.importar_csv(conn, "item,marca\nCafé,Melitta\n")
 
 
 class TestRelatorio(unittest.TestCase):

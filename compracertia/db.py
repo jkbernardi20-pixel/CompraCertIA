@@ -113,6 +113,59 @@ def registrar_compra(
     return cur.lastrowid
 
 
+def obter_compra(conn: sqlite3.Connection, compra_id: int) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT c.id, i.nome AS item, i.categoria, c.marca, c.preco,"
+        "       c.quantidade, c.unidade, c.data"
+        " FROM compras c JOIN itens i ON i.id = c.item_id"
+        " WHERE c.id = ?",
+        (compra_id,),
+    ).fetchone()
+
+
+# Campos de uma compra que podem ser corrigidos sem mexer no item/categoria.
+_CAMPOS_EDITAVEIS = {"marca", "preco", "quantidade", "unidade", "data"}
+
+
+def editar_compra(conn: sqlite3.Connection, compra_id: int, **campos) -> None:
+    """Corrige campos de uma compra registrada errada.
+
+    Só altera marca, preço, quantidade, unidade e data — trocar o item em si
+    (e sua categoria) não é edição: remova a compra e registre de novo.
+    Valores None são ignorados, então dá para atualizar só o que mudou.
+    """
+    if obter_compra(conn, compra_id) is None:
+        raise ValueError(f"Compra #{compra_id} não existe.")
+    mudancas = {c: v for c, v in campos.items() if v is not None}
+    invalidos = set(mudancas) - _CAMPOS_EDITAVEIS
+    if invalidos:
+        raise ValueError(f"Campos que não podem ser editados: {', '.join(sorted(invalidos))}.")
+    if not mudancas:
+        raise ValueError("Informe pelo menos um campo para editar.")
+    if "preco" in mudancas and mudancas["preco"] <= 0:
+        raise ValueError("Preço deve ser maior que zero.")
+    if "quantidade" in mudancas and mudancas["quantidade"] <= 0:
+        raise ValueError("Quantidade deve ser maior que zero.")
+    if "data" in mudancas:
+        mudancas["data"] = date.fromisoformat(mudancas["data"]).isoformat()
+    for texto in ("marca", "unidade"):
+        if texto in mudancas:
+            mudancas[texto] = mudancas[texto].strip()
+    atribuicoes = ", ".join(f"{c} = ?" for c in mudancas)
+    conn.execute(
+        f"UPDATE compras SET {atribuicoes} WHERE id = ?",
+        (*mudancas.values(), compra_id),
+    )
+    conn.commit()
+
+
+def remover_compra(conn: sqlite3.Connection, compra_id: int) -> None:
+    if obter_compra(conn, compra_id) is None:
+        raise ValueError(f"Compra #{compra_id} não existe.")
+    conn.execute("DELETE FROM compras WHERE id = ?", (compra_id,))
+    conn.commit()
+
+
 def registrar_alternativa(
     conn: sqlite3.Connection,
     item: str,

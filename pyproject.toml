@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "compracertia"
+version = "0.1.0"
+description = "Analisa o histórico de compras de supermercado e sinaliza onde economizar sem perder qualidade (MVP de uso pessoal)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Johnny" }]
+keywords = ["supermercado", "compras", "economia", "cli"]
+dependencies = []  # só biblioteca padrão
+
+[project.scripts]
+compracertia = "compracertia.cli:main"
+
+[project.urls]
+Repository = "https://github.com/jkbernardi20-pixel/compracertia"
+
+[tool.setuptools]
+packages = ["compracertia"]

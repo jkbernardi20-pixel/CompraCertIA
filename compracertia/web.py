@@ -1,16 +1,21 @@
 """Interface web mínima, local, sem dependências (stdlib http.server).
 
 Uma única página que permite registrar uma compra e ver o relatório —
-a prioridade do MVP. Roda só na sua máquina (127.0.0.1), sem deploy.
+a prioridade do MVP. Sem deploy.
 
     python -m compracertia web
     # abre em http://127.0.0.1:8000
+
+Para testar no celular (mesmo Wi-Fi), rode com --host 0.0.0.0: o servidor
+detecta e imprime o endereço da máquina na rede local para abrir no navegador
+do telefone.
 """
 
 from __future__ import annotations
 
 import html
 import http.server
+import socket
 import urllib.parse
 
 from . import db, relatorio
@@ -144,9 +149,37 @@ def criar_servidor(host: str, porta: int, caminho_db: str | None):
     return http.server.ThreadingHTTPServer((host, porta), _Handler)
 
 
+def _ip_lan() -> str | None:
+    """Descobre o IP da máquina na rede local, para acesso pelo celular.
+
+    Não envia nada — só usa um socket UDP para saber qual interface o SO
+    escolheria para sair à rede, e lê o IP dessa interface.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
+
+
 def servir(host: str = "127.0.0.1", porta: int = 8000, caminho_db: str | None = None) -> None:
     servidor = criar_servidor(host, porta, caminho_db)
-    print(f"CompraCertIA rodando em http://{host}:{porta}  (Ctrl+C para parar)")
+    print("CompraCertIA rodando  (Ctrl+C para parar)")
+    print(f"  Neste computador:  http://127.0.0.1:{porta}")
+    if host in ("0.0.0.0", "::"):
+        ip = _ip_lan()
+        if ip:
+            print(f"  No celular (mesmo Wi-Fi):  http://{ip}:{porta}")
+        else:
+            print("  No celular: use o IP deste computador na rede local.")
+    else:
+        print(
+            "  Para abrir no celular, reinicie com --host 0.0.0.0 "
+            "(expõe o app na sua rede local)."
+        )
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:

@@ -120,6 +120,18 @@ python -m compracertia web        # abre em http://127.0.0.1:8000
 Use `--porta` e `--host` para ajustar. A CLI continua sendo o caminho
 completo; a web cobre o essencial do dia a dia.
 
+**Testar no celular (mesmo Wi-Fi):** rode com `--host 0.0.0.0` e o servidor
+imprime o endereço da máquina na rede local — abra esse endereço no navegador
+do telefone:
+
+```bash
+python -m compracertia web --host 0.0.0.0
+# No celular (mesmo Wi-Fi):  http://192.168.x.x:8000
+```
+
+Isso expõe o app na sua rede local (sem senha), o que é adequado para uso
+pessoal em casa. Não use em redes públicas.
+
 ### Consultas rápidas
 
 ```bash

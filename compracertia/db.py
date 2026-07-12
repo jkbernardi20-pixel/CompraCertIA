@@ -43,6 +43,16 @@ CREATE TABLE IF NOT EXISTS alternativas (
     UNIQUE (item_id, marca, unidade)
 );
 
+-- Memória pessoal de códigos de barras: a câmera lê o código e o app
+-- lembra qual produto é (item + marca + unidade). Alimentada pelo próprio
+-- uso, sem base comercial externa.
+CREATE TABLE IF NOT EXISTS codigos (
+    codigo  TEXT PRIMARY KEY,                         -- EAN lido da câmera
+    item_id INTEGER NOT NULL REFERENCES itens(id),
+    marca   TEXT NOT NULL,
+    unidade TEXT NOT NULL DEFAULT 'un'
+);
+
 CREATE INDEX IF NOT EXISTS idx_compras_item ON compras(item_id);
 CREATE INDEX IF NOT EXISTS idx_alternativas_item ON alternativas(item_id);
 """
@@ -101,6 +111,7 @@ def registrar_compra(
     unidade: str = "un",
     data: str | None = None,
     categoria: str | None = None,
+    codigo: str | None = None,
 ) -> int:
     linha = obter_ou_criar_item(conn, item, categoria)
     quando = date.fromisoformat(data) if data else date.today()
@@ -110,7 +121,53 @@ def registrar_compra(
         (linha["id"], marca.strip(), preco, quantidade, unidade.strip(), quando.isoformat()),
     )
     conn.commit()
+    if codigo and codigo.strip():
+        # Aprende (ou atualiza) a associação código de barras -> produto,
+        # para a próxima leitura da câmera preencher tudo sozinha.
+        _gravar_codigo(conn, codigo.strip(), linha["id"], marca, unidade)
     return cur.lastrowid
+
+
+def _gravar_codigo(
+    conn: sqlite3.Connection, codigo: str, item_id: int, marca: str, unidade: str
+) -> None:
+    conn.execute(
+        "INSERT INTO codigos (codigo, item_id, marca, unidade) VALUES (?, ?, ?, ?)"
+        " ON CONFLICT (codigo) DO UPDATE SET"
+        "   item_id = excluded.item_id, marca = excluded.marca,"
+        "   unidade = excluded.unidade",
+        (codigo, item_id, marca.strip(), unidade.strip()),
+    )
+    conn.commit()
+
+
+def buscar_codigo(conn: sqlite3.Connection, codigo: str) -> sqlite3.Row | None:
+    """Retorna o produto que a câmera reconhece por este código, ou None."""
+    return conn.execute(
+        "SELECT c.codigo, i.nome AS item, i.categoria, c.marca, c.unidade"
+        " FROM codigos c JOIN itens i ON i.id = c.item_id"
+        " WHERE c.codigo = ?",
+        (codigo.strip(),),
+    ).fetchone()
+
+
+def salvar_codigo(
+    conn: sqlite3.Connection,
+    codigo: str,
+    item: str,
+    marca: str,
+    unidade: str = "un",
+    categoria: str | None = None,
+) -> None:
+    """Associa manualmente um código de barras a um produto.
+
+    Cria o item se ainda não existir (exige categoria nesse caso, como no
+    registro de compras).
+    """
+    if not codigo or not codigo.strip():
+        raise ValueError("Código de barras vazio.")
+    linha = obter_ou_criar_item(conn, item, categoria)
+    _gravar_codigo(conn, codigo.strip(), linha["id"], marca, unidade)
 
 
 def obter_compra(conn: sqlite3.Connection, compra_id: int) -> sqlite3.Row | None:
@@ -231,3 +288,11 @@ def listar_alternativas(
         params = (item.strip(),)
     sql += " ORDER BY i.nome, a.preco"
     return conn.execute(sql, params).fetchall()
+
+
+def listar_codigos(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT c.codigo, i.nome AS item, i.categoria, c.marca, c.unidade"
+        " FROM codigos c JOIN itens i ON i.id = c.item_id"
+        " ORDER BY i.nome, c.marca"
+    ).fetchall()

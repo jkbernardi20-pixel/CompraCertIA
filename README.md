@@ -120,6 +120,20 @@ python -m compracertia web        # abre em http://127.0.0.1:8000
 Use `--porta` e `--host` para ajustar. A CLI continua sendo o caminho
 completo; a web cobre o essencial do dia a dia.
 
+**Leitura de código de barras (câmera):** a página tem um botão *Escanear
+código de barras*. Ao ler o código, o app consulta sua **memória pessoal de
+produtos**: se já conhece aquele código, preenche item, marca e unidade
+sozinho; se é novo, você digita o nome uma vez ao registrar e ele memoriza
+para as próximas. Nenhuma base comercial externa — a memória é construída pelo
+seu próprio uso. Há também um campo para digitar o código na mão.
+
+> ⚠️ A câmera do navegador só funciona em **conexão segura (https)**. No
+> endereço `http://192.168...` da rede local ela fica bloqueada pelo navegador.
+> Para usar a câmera no celular, use o modo `compartilhar` (túnel https, abaixo)
+> — ou digite o código no campo manual. A leitura pela câmera depende do
+> navegador ter a API `BarcodeDetector` (Chrome no Android tem; alguns
+> navegadores não), e nesses casos o campo manual resolve.
+
 **Testar no celular (mesmo Wi-Fi):** rode com `--host 0.0.0.0` e o servidor
 imprime o endereço da máquina na rede local — abra esse endereço no navegador
 do telefone:
@@ -166,7 +180,11 @@ link acessa (o app não tem senha). Use para testes pontuais e encerre depois.
 python -m compracertia compras [--item Café]   # histórico (com ids)
 python -m compracertia itens                   # itens e categorias
 python -m compracertia alternativas [--item Café]
+python -m compracertia codigos                 # códigos de barras memorizados
 ```
+
+Para associar um código de barras a um produto pela linha de comando, use
+`registrar ... --codigo 7891234567890` — funciona igual à leitura pela câmera.
 
 ## Como a economia é calculada
 

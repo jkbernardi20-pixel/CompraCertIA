@@ -45,6 +45,10 @@ def _construir_parser() -> argparse.ArgumentParser:
         help="obrigatório só na 1ª compra do item: A = decisão técnica "
         "mensurável; B = preferência pessoal (nunca otimizado)",
     )
+    p.add_argument(
+        "--codigo",
+        help="código de barras (EAN) — o app memoriza o produto para as próximas leituras",
+    )
 
     p = sub.add_parser(
         "alternativa", help="cadastrar alternativa para comparação (só Categoria A)"
@@ -92,6 +96,10 @@ def _construir_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("itens", help="listar itens e categorias")
 
+    sub.add_parser(
+        "codigos", help="listar códigos de barras memorizados e seus produtos"
+    )
+
     p = sub.add_parser("alternativas", help="listar alternativas cadastradas")
     p.add_argument("--item", help="filtrar por item")
 
@@ -129,10 +137,12 @@ def main(argv: list[str] | None = None) -> int:
                 unidade=args.unidade,
                 data=args.data,
                 categoria=args.categoria,
+                codigo=args.codigo,
             )
+            extra = " (código de barras memorizado)" if args.codigo else ""
             print(
                 f"Compra registrada: {args.quantidade:g}x {args.item} "
-                f"({args.unidade}) {args.marca} — R$ {args.preco:.2f}"
+                f"({args.unidade}) {args.marca} — R$ {args.preco:.2f}{extra}"
             )
         elif args.comando == "alternativa":
             db.registrar_alternativa(
@@ -195,6 +205,15 @@ def main(argv: list[str] | None = None) -> int:
                 print("Nenhum item cadastrado.")
             for i in linhas:
                 print(f"{i['nome']} [{i['categoria']}] — {i['n_compras']} compra(s)")
+        elif args.comando == "codigos":
+            linhas = db.listar_codigos(conn)
+            if not linhas:
+                print("Nenhum código de barras memorizado ainda.")
+            for c in linhas:
+                print(
+                    f"{c['codigo']}  ->  {c['item']} [{c['categoria']}]  "
+                    f"{c['marca']} ({c['unidade']})"
+                )
         elif args.comando == "alternativas":
             linhas = db.listar_alternativas(conn, args.item)
             if not linhas:

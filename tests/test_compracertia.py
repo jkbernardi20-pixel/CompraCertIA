@@ -180,6 +180,52 @@ class TestImportacaoCSV(unittest.TestCase):
             importacao.importar_csv(conn, "item,marca\nCafé,Melitta\n")
 
 
+class TestCodigoBarras(unittest.TestCase):
+    def test_registrar_com_codigo_memoriza_produto(self):
+        conn = _banco()
+        db.registrar_compra(
+            conn, "Café", "Melitta", 18.90, 1, "500g",
+            "2025-01-10", "A", codigo="7891234567890",
+        )
+        achado = db.buscar_codigo(conn, "7891234567890")
+        self.assertIsNotNone(achado)
+        self.assertEqual(achado["item"], "Café")
+        self.assertEqual(achado["marca"], "Melitta")
+        self.assertEqual(achado["unidade"], "500g")
+        self.assertEqual(achado["categoria"], "A")
+
+    def test_codigo_desconhecido(self):
+        conn = _banco()
+        self.assertIsNone(db.buscar_codigo(conn, "0000000000000"))
+
+    def test_recompra_atualiza_associacao(self):
+        conn = _banco()
+        db.registrar_compra(conn, "Café", "Marca A", 18.90, 1, "500g",
+                            "2025-01-10", "A", codigo="789")
+        # Mesmo código, marca diferente numa compra posterior: atualiza.
+        db.registrar_compra(conn, "Café", "Marca B", 17.50, 1, "500g",
+                            "2025-02-10", codigo="789")
+        achado = db.buscar_codigo(conn, "789")
+        self.assertEqual(achado["marca"], "Marca B")
+        # Não duplica: um código -> um produto.
+        self.assertEqual(len(db.listar_codigos(conn)), 1)
+
+    def test_salvar_codigo_direto(self):
+        conn = _banco()
+        db.salvar_codigo(conn, "555", "Leite", "Italac", "1L", categoria="A")
+        achado = db.buscar_codigo(conn, "555")
+        self.assertEqual(achado["item"], "Leite")
+        # Item novo sem categoria deve falhar (mesma regra do registro).
+        with self.assertRaises(ValueError):
+            db.salvar_codigo(conn, "666", "Novo", "X", "un")
+
+    def test_codigo_vazio_ignorado_no_registro(self):
+        conn = _banco()
+        db.registrar_compra(conn, "Café", "Melitta", 18.90, 1, "500g",
+                            "2025-01-10", "A", codigo="   ")
+        self.assertEqual(db.listar_codigos(conn), [])
+
+
 class TestCompartilhar(unittest.TestCase):
     def test_regex_extrai_url_publica(self):
         linha = (

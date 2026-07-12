@@ -81,6 +81,12 @@ def _construir_parser() -> argparse.ArgumentParser:
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--porta", type=int, default=8000)
 
+    p = sub.add_parser(
+        "compartilhar",
+        help="expor a interface web numa URL pública temporária (requer cloudflared)",
+    )
+    p.add_argument("--porta", type=int, default=8000)
+
     p = sub.add_parser("compras", help="listar compras registradas")
     p.add_argument("--item", help="filtrar por item")
 
@@ -99,6 +105,16 @@ def main(argv: list[str] | None = None) -> int:
         from . import web  # importado sob demanda: só o comando 'web' precisa
 
         web.servir(host=args.host, porta=args.porta, caminho_db=args.db)
+        return 0
+
+    if args.comando == "compartilhar":
+        from . import compartilhar  # importado sob demanda
+
+        try:
+            compartilhar.compartilhar(porta=args.porta, caminho_db=args.db)
+        except RuntimeError as erro:
+            print(f"Erro: {erro}", file=sys.stderr)
+            return 1
         return 0
 
     conn = db.conectar(args.db)

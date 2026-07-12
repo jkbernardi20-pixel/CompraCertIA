@@ -132,6 +132,34 @@ python -m compracertia web --host 0.0.0.0
 Isso expõe o app na sua rede local (sem senha), o que é adequado para uso
 pessoal em casa. Não use em redes públicas.
 
+*Não conectou pelo celular na rede local?* É comum: o firewall do PC pode
+bloquear a porta, ou o roteador isola os dispositivos entre si (Wi-Fi de
+convidado, "AP/client isolation"). Nesses casos o acesso externo abaixo
+resolve — o túnel é uma conexão de saída do PC e não depende de os dois
+aparelhos se enxergarem na rede.
+
+### Testar no celular fora de casa (acesso externo)
+
+Para abrir no celular em qualquer rede (4G, fora de casa), o comando
+`compartilhar` expõe a interface numa URL pública temporária via
+[Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-tunnel/downloads/),
+sem deploy, sem conta e sem abrir portas no roteador:
+
+```bash
+python -m compracertia compartilhar
+```
+
+Requisito: o binário `cloudflared` instalado
+(`brew install cloudflared` no macOS; `winget install Cloudflare.cloudflared`
+no Windows; pacote/baixa direta no Linux). O comando sobe o servidor, abre o
+túnel e imprime uma URL `https://...trycloudflare.com` — abra no celular. Com
+o extra opcional de QR instalado (`pip install "compracertia[qr]"`), ele ainda
+desenha um QR Code no terminal para escanear direto. `Ctrl+C` encerra o
+compartilhamento e fecha a URL.
+
+A URL é temporária e pública enquanto o comando roda: qualquer pessoa com o
+link acessa (o app não tem senha). Use para testes pontuais e encerre depois.
+
 ### Consultas rápidas
 
 ```bash

@@ -3,7 +3,9 @@
 import unittest
 from datetime import date
 
-from compracertia import analise, db, importacao, relatorio
+from unittest import mock
+
+from compracertia import analise, compartilhar, db, importacao, relatorio
 
 
 def _banco():
@@ -176,6 +178,30 @@ class TestImportacaoCSV(unittest.TestCase):
         conn = _banco()
         with self.assertRaises(ValueError):
             importacao.importar_csv(conn, "item,marca\nCafé,Melitta\n")
+
+
+class TestCompartilhar(unittest.TestCase):
+    def test_regex_extrai_url_publica(self):
+        linha = (
+            "2025-01-01T00:00:00Z INF +---+\n"
+            "| https://exemplo-teste-abc.trycloudflare.com |"
+        )
+        achada = compartilhar.URL_PUBLICA_RE.search(linha)
+        self.assertIsNotNone(achada)
+        self.assertEqual(
+            achada.group(0), "https://exemplo-teste-abc.trycloudflare.com"
+        )
+
+    def test_regex_ignora_outras_urls(self):
+        self.assertIsNone(
+            compartilhar.URL_PUBLICA_RE.search("veja https://github.com/x/y")
+        )
+
+    def test_erro_claro_sem_cloudflared(self):
+        with mock.patch("compracertia.compartilhar.shutil.which", return_value=None):
+            with self.assertRaises(RuntimeError) as ctx:
+                compartilhar.compartilhar(porta=8000)
+        self.assertIn("cloudflared", str(ctx.exception))
 
 
 class TestRelatorio(unittest.TestCase):

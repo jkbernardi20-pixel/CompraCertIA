@@ -13,6 +13,10 @@ authors = [{ name = "Johnny" }]
 keywords = ["supermercado", "compras", "economia", "cli"]
 dependencies = []  # só biblioteca padrão
 
+# Opcional: QR no terminal ao compartilhar (pip install "compracertia[qr]").
+[project.optional-dependencies]
+qr = ["segno>=1.5"]
+
 [project.scripts]
 compracertia = "compracertia.cli:main"
 
